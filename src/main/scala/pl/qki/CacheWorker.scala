@@ -32,7 +32,7 @@ class CacheWorker extends Actor with ActorLogging {
     case MemberUp(m) => register(m)
 
     case Rebalance(toHash, newCache) =>
-      newCache ! Populate(cache.dropWhile(p => p._1 < toHash))
+      newCache ! Populate(cache.dropWhile { case (hash, _) => hash < toHash})
   }
 
   private def register(member: Member): Unit =

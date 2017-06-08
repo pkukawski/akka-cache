@@ -13,11 +13,11 @@ class CacheRouter extends Actor with ActorLogging with Stash {
 
   override def receive: Receive = {
     case g @ Get(hash) =>
-      workerMap.find(t => t._1 > hash) match {
-        case Some(ref) =>
-          ref._2 forward g
+      workerMap.find { case (hashFromMap, _) => hashFromMap > hash} match {
+        case Some((_, ref)) =>
+          ref forward g
         case None => workerMap.headOption match {
-          case Some(r) => r._2 forward g
+          case Some((_, r)) => r forward g
           case None => sender() ! Cached(hash, None)
         }
       }
@@ -26,14 +26,14 @@ class CacheRouter extends Actor with ActorLogging with Stash {
       stash()
 
     case add @ Add(_, hash)  =>
-      workerMap.find(t => t._1 > hash) match {
-        case Some(t) =>
-          log.info(s"Attempt to add: $hash to: ${t._1} (workers: ${workerMap.keySet})")
-          t._2 ! add
+      workerMap.find { case (hashFromMap, _) => hashFromMap > hash} match {
+        case Some((h, ref)) =>
+          log.info(s"Attempt to add: $hash to: $h (workers: ${workerMap.keySet})")
+          ref ! add
         case None => workerMap.headOption match {
-          case Some(r) =>
-            log.info(s"Attempt to add: $hash to: ${r._1} (workers: ${workerMap.keySet})")
-            r._2 ! add
+          case Some((h, ref)) =>
+            log.info(s"Attempt to add: $hash to: $h (workers: ${workerMap.keySet})")
+            ref ! add
           case None => log.error(s"Cannot add: $hash to workers: ${workerMap.keySet}")
         }
       }
@@ -45,7 +45,7 @@ class CacheRouter extends Actor with ActorLogging with Stash {
       unstashAll()
 
     case Terminated(a) =>
-      workerMap = workerMap.filterNot(t => t._2 == a)
+      workerMap = workerMap.filterNot {case (_, ref) => ref == a}
   }
 }
 
